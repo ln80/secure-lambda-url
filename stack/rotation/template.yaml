@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAM Template for secure-lambda-url Rotation Lambda
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: secure-lambda-url-rotation
+    Description: |
+      A Secretsmanager rotation Lambda function that optionally updates the CloudFront origin custom header.
+      https://github.com/ln80/secure-lambda-url
+    
+    Author: Reda Laanait
+    SpdxLicenseId: MIT
+    LicenseUrl: ../../LICENSE
+    ReadmeUrl: ../../README.md
+    HomePageUrl: https://github.com/ln80/secure-lambda-url
+    SourceCodeUrl: https://github.com/ln80/secure-lambda-url
+    Labels: ['lambda', 'function-url', 'secretsmanager', 'rotation', 'cloudfront']
+    SemanticVersion: 1.0.0
+
+Parameters:
+  SecretArn:
+    Type: String
+    Description: The secretsmanager secret ARN.
+
+  Endpoint:
+    Type: String
+    Description: The secretsmanager endpoint to use.
+
+  DistributionId:
+    Type: String
+    Description: |
+      cloudfront distribution which Rotation Lambda updates its origins custom header
+    Default: ''
+
+  CustomHeaderName:
+    Type: String
+    Description: |
+      cloudfront origin custom header to update its value by the rotated secret
+    Default: ''
+
+Conditions:
+  DistributionExists:
+    !Not
+      - !Equals
+        - ''
+        - !Ref DistributionId
+
+Resources:
+  RotationLambda:
+    Type: AWS::Serverless::Function 
+    Metadata:
+      BuildMethod: go1.x
+    Properties:
+      Description: | 
+        Rotate the secretsmanager secret and optionally updates the cloudfront origin custom header.
+      Timeout: 30
+      Runtime: provided.al2
+      Handler: bootstrap
+      Architectures: [ arm64 ]
+      CodeUri: stack/rotation/
+      Policies:
+        - !If
+          - DistributionExists
+          - Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cloudfront:GetDistributionConfig
+                  - cloudfront:UpdateDistribution
+                Resource: !Sub
+                  - "arn:aws:cloudfront::${AWS::AccountId}:distribution/${DistributionId}"
+                  - { DistributionId: !Ref DistributionId }
+          - !Ref AWS::NoValue
+      Environment:
+        Variables:
+          SECRETS_MANAGER_ENDPOINT: !Ref Endpoint
+          DISTRIBUTION_ID: !Ref DistributionId
+          CUSTOM_HEADER_NAME: !Ref CustomHeaderName
+      Tags:
+        SecretsManagerLambda: Rotation
+
+  RotationPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      PolicyDocument: 
+        Version: 2012-10-17
+        Statement: 
+          - Effect: Allow
+            Action: 
+              - secretsmanager:DescribeSecret
+              - secretsmanager:GetSecretValue
+              - secretsmanager:PutSecretValue
+              - secretsmanager:UpdateSecretVersionStage
+            Resource:
+              - !Ref SecretArn
+            Condition:
+              StringEquals:
+                secretsmanager:resource/AllowRotationLambdaArn: !GetAtt RotationLambda.Arn
+          - Effect: Allow
+            Action:
+              - secretsmanager:GetRandomPassword
+            Resource: "*"
+      Roles:
+        - !Ref RotationLambdaRole
+
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !GetAtt RotationLambda.Arn
+      Principal: secretsmanager.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+  
+Outputs:
+  RotationLambdaArn:
+    Description: "The Rotation Lambda Function ARN"
+    Value: !GetAtt RotationLambda.Arn

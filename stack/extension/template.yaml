@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SAM Template for secure-lambda-url Lambda Extension
+
+Metadata:
+  AWS::ServerlessRepo::Application:
+    Name: secure-lambda-url-extension
+    Description: |
+      Secure Lambda URL Lambda Extension (layer)
+      https://github.com/ln80/secure-lambda-url
+    
+    Author: Reda Laanait
+    SpdxLicenseId: MIT
+    LicenseUrl: ../../LICENSE
+    ReadmeUrl: ../../README.md
+    HomePageUrl: https://github.com/ln80/secure-lambda-url
+    SourceCodeUrl: https://github.com/ln80/secure-lambda-url
+    Labels: ['lambda', 'function-url', 'secretsmanager', 'authorization']
+    SemanticVersion: 1.0.0
+
+Resources:
+  LambdaExtensionLayer:
+    Type: AWS::Serverless::LayerVersion
+    Metadata:
+      BuildMethod: makefile
+      BuildArchitecture: "x86_64"
+    Properties:
+      CompatibleArchitectures:
+        - x86_64
+      LayerName: secure-lambda-url-extension
+      Description: Lambda extension layer to authorize lambda url invocations
+      ContentUri: .
+
+  LambdaExtensionArm64Layer:
+    Type: AWS::Serverless::LayerVersion
+    Metadata:
+      BuildMethod: makefile
+      BuildArchitecture: arm64
+    Properties:
+      CompatibleArchitectures:
+        - arm64
+      LayerName: secure-lambda-url-extension-arm64
+      Description: Lambda extension layer to authorize lambda url invocations
+      ContentUri: .
+  
+Outputs:
+  LambdaExtensionLayer:
+    Description: Lambda extension layer to authorize lambda url invocations (x86_64)
+    Value: !Ref LambdaExtensionLayer
+
+  LambdaExtensionArm64Layer:
+    Description: Lambda extension layer to authorize lambda url invocation (Arm64)
+    Value: !Ref LambdaExtensionArm64Layer
