@@ -30,7 +30,7 @@ func TestAuthorizer(t *testing.T) {
 			ac.GracePeriod = time.Second
 		})
 
-		err := auth.Authorize(ctx, secret, "")
+		err, _ := auth.Authorize(ctx, secret, "")
 		if want, got := ErrInvalidSecretValue, err; !errors.Is(got, want) {
 			t.Fatalf("expect %v, %v be equals", want, got)
 		}
@@ -52,7 +52,7 @@ func TestAuthorizer(t *testing.T) {
 			ac.CoolDownPeriod = time.Second
 			ac.GracePeriod = time.Second
 		})
-		err := auth.Authorize(ctx, secret, value)
+		err, _ := auth.Authorize(ctx, secret, value)
 		if want, got := ErrAuthorizationFailed, err; !errors.Is(got, want) {
 			t.Fatalf("expect %v, %v be equals", want, got)
 		}
@@ -61,7 +61,7 @@ func TestAuthorizer(t *testing.T) {
 		}
 
 		// Make sure value is not black listed, this implies a second secret API call
-		err = auth.Authorize(ctx, secret, value)
+		err, _ = auth.Authorize(ctx, secret, value)
 		if want, got := ErrAuthorizationFailed, err; !errors.Is(got, want) {
 			t.Fatalf("expect %v, %v be equals", want, got)
 		}
@@ -85,31 +85,37 @@ func TestAuthorizer(t *testing.T) {
 			ac.GracePeriod = time.Second
 		})
 
-		err := auth.Authorize(ctx, secret, value)
+		err, _ := auth.Authorize(ctx, secret, value)
 		if want, got := ErrUnauthorized, err; !errors.Is(got, want) {
 			t.Fatalf("expect %v, %v be equals", want, got)
 		}
 
 		// a second 'Authorize' call should not trigger secret API call,
 		// the invalid value must be already in the blacklist cache
-		err = auth.Authorize(ctx, secret, value)
+		err, remoteCalled := auth.Authorize(ctx, secret, value)
 		if want, got := ErrUnauthorized, err; !errors.Is(got, want) {
 			t.Fatalf("expect %v, %v be equals", want, got)
 		}
 		if spyCalls != 1 {
 			t.Fatal("expect 'GetSecretValue' is called once")
 		}
+		if !remoteCalled {
+			t.Fatal("expect 'remoteCalled' be true, got false")
+		}
 
 		// wait until the cache is expired
 		time.Sleep(ttl + 100*time.Millisecond)
 
 		// a second secret API call has to be made
-		err = auth.Authorize(ctx, secret, value)
+		err, remoteCalled = auth.Authorize(ctx, secret, value)
 		if want, got := ErrUnauthorized, err; !errors.Is(got, want) {
 			t.Fatalf("expect %v, %v be equals", want, got)
 		}
 		if spyCalls != 2 {
 			t.Fatal("expect 'GetSecretValue' is called twice")
+		}
+		if remoteCalled {
+			t.Fatal("expect 'remoteCalled' be false, got true")
 		}
 	})
 
@@ -130,30 +136,36 @@ func TestAuthorizer(t *testing.T) {
 			ac.GracePeriod = time.Second
 		})
 
-		err := auth.Authorize(ctx, secret, value)
+		err, _ := auth.Authorize(ctx, secret, value)
 		if err != nil {
 			t.Fatalf("expect error be nil, got %v", err)
 		}
 
 		// a second call of 'Authorize' must use the cached secret value
-		err = auth.Authorize(ctx, secret, value)
+		err, remoteCalled := auth.Authorize(ctx, secret, value)
 		if err != nil {
 			t.Fatalf("expect error be nil, got %v", err)
 		}
 		if spyCalls != 1 {
 			t.Fatal("expect 'GetSecretValue' is called once", spyCalls)
 		}
+		if remoteCalled {
+			t.Fatal("expect 'remoteCalled' be false, got true")
+		}
 
 		// wait until the cache is expired
 		time.Sleep(ttl + 100*time.Millisecond)
 
 		// a second secret API call has to be made
-		err = auth.Authorize(ctx, secret, value)
+		err, remoteCalled = auth.Authorize(ctx, secret, value)
 		if err != nil {
 			t.Fatalf("expect error be nil, got %v", err)
 		}
 		if spyCalls != 2 {
 			t.Fatal("expect 'GetSecretValue' is called twice")
+		}
+		if !remoteCalled {
+			t.Fatal("expect 'remoteCalled' be true, got false")
 		}
 	})
 }

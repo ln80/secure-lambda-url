@@ -18,7 +18,7 @@ var (
 )
 
 type Authorizer interface {
-	Authorize(ctx context.Context, secretID, value string) error
+	Authorize(ctx context.Context, secretID, value string) (err error, remoteCalled bool)
 }
 
 type AuthorizerConfig struct {
@@ -58,12 +58,12 @@ func NewAuthorizer(cli ClientAPI, j *Janitor, opts ...func(*AuthorizerConfig)) *
 	}
 }
 
-func (a *DefaultAuthorizer) Authorize(ctx context.Context, secretID, value string) error {
+func (a *DefaultAuthorizer) Authorize(ctx context.Context, secretID, value string) (error, bool) {
 	if value == "" {
-		return ErrInvalidSecretValue
+		return ErrInvalidSecretValue, false
 	}
 	if a.janitor.isBlackListed(value) {
-		return ErrUnauthorized
+		return ErrUnauthorized, false
 	}
 
 	cur, prev, pen, _ := a.janitor.getCache()
@@ -77,7 +77,6 @@ func (a *DefaultAuthorizer) Authorize(ctx context.Context, secretID, value strin
 			SecretId:     aws.String(secretID),
 			VersionStage: aws.String(stage),
 		})
-
 		s := secret{}
 		if err != nil {
 			var te *types.ResourceNotFoundException
@@ -93,47 +92,52 @@ func (a *DefaultAuthorizer) Authorize(ctx context.Context, secretID, value strin
 	}
 
 	if cur.value == value {
-		return nil
+		return nil, false
 	}
 	// only refresh secret cache value if cool down period is exceeded
 	if time.Since(cur.createdAt) > a.cfg.CoolDownPeriod {
-		var err error
+		var (
+			err error
+		)
 		cur, err = getSecret(VersionCurrent)
 		if err != nil {
-			return err
+			return err, true
 		}
 		if cur.value == value {
-			return nil
+			return nil, true
 		}
 	}
 
 	// Grace Period is a short and transitional period
 	// during which checking auth against PREVIOUS and PENDING values is tolerated
 	if time.Since(cur.createdAt) < a.cfg.GracePeriod {
+		remoteCalled := false
 		if time.Since(prev.createdAt) > a.cfg.CoolDownPeriod {
 			var err error
 			prev, err = getSecret(VersionPrevious)
+			remoteCalled = true
 			if err != nil {
-				return err
+				return err, remoteCalled
 			}
 		}
 		if prev.value == value {
-			return nil
+			return nil, remoteCalled
 		}
 
 		if time.Since(pen.createdAt) > a.cfg.CoolDownPeriod {
 			var err error
 			pen, err = getSecret(VersionPending)
+			remoteCalled = true
 			if err != nil {
-				return err
+				return err, remoteCalled
 			}
 		}
 		if pen.value == value {
-			return nil
+			return nil, remoteCalled
 		}
 	}
 
 	a.janitor.blackList(value)
 
-	return ErrUnauthorized
+	return ErrUnauthorized, false
 }

@@ -10,29 +10,44 @@ import (
 	"time"
 
 	"github.com/ln80/secure-lambda-url/secretsmanager"
+	"github.com/prozz/aws-embedded-metrics-golang/emf"
 )
 
 // MakeHandler returns the http.Handler used by the sidecar process.
 // Lambda handler will issue HTTP Get requests to this server for API key validation.
 func MakeHandler(secretID, token string, auth secretsmanager.Authorizer) http.Handler {
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		m := emf.New().
+			Namespace("Ln80/SecureLambdaUrl")
+		// Dimension("lambdaFunction", os.Getenv("AWS_LAMBDA_FUNCTION_NAME"))
+		defer m.Log()
+
 		if r.Method != http.MethodGet || r.URL.Path != "/" {
 			http.Error(w, "bad request", http.StatusBadRequest)
+			m.Metric("BadRequest", 1)
 			return
 		}
 		if t := r.Header.Get("X-Aws-Token"); t != token {
 			http.Error(w, "bad request", http.StatusBadRequest)
+			m.Metric("BadRequest", 1)
 			return
 		}
 
 		k := strings.TrimSpace(r.URL.Query().Get("key"))
 
-		if err := auth.Authorize(r.Context(), secretID, k); err != nil {
+		err, remoteCalled := auth.Authorize(r.Context(), secretID, k)
+		if remoteCalled {
+			m.Metric("SecretRequested", 1)
+		}
+		if err != nil {
 			if errors.Is(err, secretsmanager.ErrUnauthorized) {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
+				m.Metric("Unauthorized", 1)
 				return
 			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			m.Metric("InternalError", 1)
 			return
 		}
 

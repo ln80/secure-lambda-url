@@ -140,8 +140,8 @@ func TestServer(t *testing.T) {
 			}
 
 			// test unauthorized request
-			authMock.AuthorizeFn = func(ctx context.Context, secretID, value string) error {
-				return secretsmanager.ErrUnauthorized
+			authMock.AuthorizeFn = func(ctx context.Context, secretID, value string) (error, bool) {
+				return secretsmanager.ErrUnauthorized, false
 			}
 			req, _ = http.NewRequest("GET", "http://localhost:"+port+"/?key=xyz", nil)
 			req.Header.Add("X-Aws-Token", token)
@@ -152,8 +152,8 @@ func TestServer(t *testing.T) {
 			}
 
 			// test unexpected authorizer failed request
-			authMock.AuthorizeFn = func(ctx context.Context, secretID, value string) error {
-				return secretsmanager.ErrAuthorizationFailed
+			authMock.AuthorizeFn = func(ctx context.Context, secretID, value string) (error, bool) {
+				return secretsmanager.ErrAuthorizationFailed, false
 			}
 			req, _ = http.NewRequest("GET", "http://localhost:"+port+"/?key=xyz", nil)
 			req.Header.Add("X-Aws-Token", token)

@@ -17,7 +17,7 @@ Metadata:
     HomePageUrl: https://github.com/ln80/secure-lambda-url
     SourceCodeUrl: https://github.com/ln80/secure-lambda-url
     Labels: ['lambda', 'function-url', 'secretsmanager', 'authorization']
-    SemanticVersion: 1.0.0
+    SemanticVersion: 1.0.2
 
 Resources:
   LambdaExtensionLayer:

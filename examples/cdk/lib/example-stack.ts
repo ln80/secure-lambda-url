@@ -30,7 +30,7 @@ export class ExampleStack extends cdk.Stack {
       location: {
         applicationId:
           "arn:aws:serverlessrepo:eu-west-1:015397314665:applications/secure-lambda-url-extension",
-        semanticVersion: "0.9.0",
+        semanticVersion: "1.0.2",
       },
       parameters: {},
     });
@@ -42,7 +42,6 @@ export class ExampleStack extends cdk.Stack {
       entry: "src/index.ts",
       environment: {
         SECURE_LAMBDA_URL_SECRET_ENDPOINT: SECRETS_MANAGER_ENDPOINT,
-        SECRETS_MANAGER_ENDPOINT: SECRETS_MANAGER_ENDPOINT,
         SECURE_LAMBDA_URL_SECRET_ARN: secret.secretArn,
         SECURE_LAMBDA_URL_HEADER_NAME: SECRET_CUSTOM_HEADER,
       },
@@ -90,7 +89,7 @@ export class ExampleStack extends cdk.Stack {
       location: {
         applicationId:
           "arn:aws:serverlessrepo:eu-west-1:015397314665:applications/secure-lambda-url-rotation",
-        semanticVersion: "0.4.1",
+        semanticVersion: "1.0.2",
       },
 
       parameters: {
@@ -151,8 +150,6 @@ export class ExampleStack extends cdk.Stack {
         }),
       }
     );
-
-    // https://kuwyyqx3wge457l4lqvt5dcxtm0jwihc.lambda-url.eu-west-1.on.aws/
 
     // Output the CloudFront distribution domain name
     new cdk.CfnOutput(this, "CloudfrontDistribution", {
