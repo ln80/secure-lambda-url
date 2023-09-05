@@ -30,7 +30,7 @@ func MakeHandler(secretID, token string, auth secretsmanager.Authorizer) http.Ha
 		}
 		if t := r.Header.Get("X-Aws-Token"); t != token {
 			http.Error(w, "bad request", http.StatusBadRequest)
-			m.Metric("BadRequest", 1)
+			m.Metric("BadRequestCount", 1)
 			return
 		}
 
@@ -38,16 +38,16 @@ func MakeHandler(secretID, token string, auth secretsmanager.Authorizer) http.Ha
 
 		err, remoteCalled := auth.Authorize(r.Context(), secretID, k)
 		if remoteCalled {
-			m.Metric("SecretRequested", 1)
+			m.Metric("SecretRequestCount", 1)
 		}
 		if err != nil {
 			if errors.Is(err, secretsmanager.ErrUnauthorized) {
 				http.Error(w, err.Error(), http.StatusUnauthorized)
-				m.Metric("Unauthorized", 1)
+				m.Metric("UnauthorizedCount", 1)
 				return
 			}
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			m.Metric("InternalError", 1)
+			m.Metric("InternalErrorCount", 1)
 			return
 		}
 
